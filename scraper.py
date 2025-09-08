@@ -9,6 +9,7 @@ from termcolor import colored
 
 init()
 
+# Global dictionary for all categories
 Scraped_Links = {}
 
 
@@ -18,6 +19,7 @@ def ensure_output_dir():
 
 
 def save_m3u(category, links, base_name="output"):
+    """Save links into a category-specific m3u file"""
     if not links:
         print(colored(f"[!] No links found for {category}", "red"))
         return
@@ -30,10 +32,12 @@ def save_m3u(category, links, base_name="output"):
 
 
 def save_merged(base_name="output"):
+    """Save all links into one merged m3u file"""
     all_links = []
     for cat_links in Scraped_Links.values():
         all_links.extend(cat_links)
-    all_links = list(set(all_links))
+    all_links = list(set(all_links))  # deduplicate
+
     if not all_links:
         print(colored("[!] No links collected in total", "red"))
         return
@@ -46,6 +50,7 @@ def save_merged(base_name="output"):
 
 
 def scrape_streamtest(channel, pages=1):
+    """Scrape tested IPTV links from streamtest.in"""
     print(colored("[*] Scraping streamtest.in ...", "yellow"))
     Scraped_Links["Streamtest"] = []
     for page in range(1, pages + 1):
@@ -60,22 +65,44 @@ def scrape_streamtest(channel, pages=1):
     Scraped_Links["Streamtest"] = list(set(Scraped_Links["Streamtest"]))
 
 
-def scrape_iptv_org(url, category, keyword=None):
-    print(colored(f"[*] Scraping iptv-org ({category}) ...", "yellow"))
-    Scraped_Links[category] = []
+def scrape_iptv_org_categorized(url):
+    """Scrape iptv-org streams and auto-categorize by group-title"""
+    print(colored(f"[*] Scraping iptv-org (auto-categorized) ...", "yellow"))
     try:
         result = requests.get(url, timeout=15).text.splitlines()
+        category_links = {}
+        current_group = "Unknown"
+
         for line in result:
-            if line.startswith("http"):
-                if not keyword or keyword.lower() in line.lower():
-                    Scraped_Links[category].append(line)
-        Scraped_Links[category] = list(set(Scraped_Links[category]))
-        print(f"  Found {len(Scraped_Links[category])} links in {category}")
+            line = line.strip()
+            if line.startswith("#EXTINF"):
+                match = re.search(r'group-title="([^"]+)"', line)
+                if match:
+                    current_group = match.group(1)
+            elif line.startswith("http"):
+                if current_group not in category_links:
+                    category_links[current_group] = []
+                category_links[current_group].append(line)
+
+        # Merge into global dictionary
+        for cat, links in category_links.items():
+            if cat not in Scraped_Links:
+                Scraped_Links[cat] = []
+            Scraped_Links[cat].extend(links)
+
+        # Deduplicate per category
+        for cat in Scraped_Links:
+            Scraped_Links[cat] = list(set(Scraped_Links[cat]))
+
+        for cat in category_links:
+            print(f"  Found {len(category_links[cat])} links in {cat}")
+
     except Exception as e:
-        print(colored(f"  [Error {category}] {e}", "red"))
+        print(colored(f"  [Error] {e}", "red"))
 
 
 def main():
+    # Banner
     art = text2art("IPTV Scraper")
     print(colored(art, "cyan"))
     print(colored("Developed By Surya...!!!", "blue"))
@@ -86,19 +113,24 @@ def main():
     else:
         channel_name = input("Channel keyword (leave empty for all): ").strip()
         try:
-            pages = int(input("How many pages to scrape from streamtest.in enter page number =   "))
+            pages = int(input("How many pages to scrape from streamtest.in? "))
         except:
             pages = 1
 
     ensure_output_dir()
 
-    # 🔹 Updated IPTV-ORG sources (new structure)
+    # Scrape sources
     scrape_streamtest(channel_name, pages)
-    scrape_iptv_org("https://raw.githubusercontent.com/iptv-org/iptv/master/streams/in.m3u", "General", channel_name)
-    scrape_iptv_org("https://raw.githubusercontent.com/iptv-org/iptv/master/streams/movies.m3u", "Movies", channel_name)
-    scrape_iptv_org("https://raw.githubusercontent.com/iptv-org/iptv/master/streams/news.m3u", "News", channel_name)
-    scrape_iptv_org("https://raw.githubusercontent.com/iptv-org/iptv/master/streams/entertainment.m3u", "Entertainment", channel_name)
-    scrape_iptv_org("https://raw.githubusercontent.com/iptv-org/iptv/master/streams/sports.m3u", "Sports", channel_name)
+
+    iptv_urls = [
+        "https://raw.githubusercontent.com/iptv-org/iptv/master/streams/in.m3u",
+        "https://raw.githubusercontent.com/iptv-org/iptv/master/streams/movies.m3u",
+        "https://raw.githubusercontent.com/iptv-org/iptv/master/streams/news.m3u",
+        "https://raw.githubusercontent.com/iptv-org/iptv/master/streams/entertainment.m3u",
+        "https://raw.githubusercontent.com/iptv-org/iptv/master/streams/sports.m3u",
+    ]
+    for url in iptv_urls:
+        scrape_iptv_org_categorized(url)
 
     base = channel_name if channel_name else "INDIA"
     for category, links in Scraped_Links.items():
