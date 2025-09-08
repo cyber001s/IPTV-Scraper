@@ -1,124 +1,119 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-INDIA IPTV Scraper
-==================
-Scrapes IPTV links from multiple sources:
-- streamtest.in logs
-- iptv-org India master list
-- iptv-org Movies / News / Entertainment / Sports categories
-Outputs:
-- Category-wise .m3u files
-- One merged ALL.m3u
-"""
-
+import os
+import re
+import sys
+import datetime
 import requests
 from bs4 import BeautifulSoup
-import datetime
-import re
-import os
 from art import text2art
 from colorama import init
 from termcolor import colored
 
-# Store links by category
-Scraped_Links = {
-    "Movies": set(),
-    "News": set(),
-    "Entertainment": set(),
-    "Sports": set(),
-    "General": set()
-}
+init()
 
-init(autoreset=True)
+# Store scraped links by category
+Scraped_Links = {}
 
 
 def ensure_output_dir():
-    """Ensure output folder exists"""
-    os.makedirs("playlists", exist_ok=True)
+    if not os.path.exists("playlists"):
+        os.makedirs("playlists")
 
 
-def save_m3u(category, links, base_name="INDIA"):
-    """Save category-wise m3u file"""
+def save_m3u(category, links, base_name="output"):
+    """Save links into a category-specific m3u file"""
     if not links:
+        print(colored(f"[!] No links found for {category}", "red"))
         return
-    filename = f"playlists/{base_name}-{category}.m3u"
-    with open(filename, "w", encoding="utf-8") as f:
-        for l in sorted(links):
-            f.write(f"{l}\n")
-    print(f"[✓] Saved {len(links)} links → {filename}")
+    x = datetime.datetime.now()
+    fname = f"playlists/{category}_{base_name}_{x.strftime('%d-%m-%y_%H-%M-%S')}.m3u"
+    with open(fname, "w", encoding="utf-8") as f:
+        for link in links:
+            f.write(f"{link}\n")
+    print(colored(f"[*] Saved {len(links)} links → {fname}", "green"))
 
 
-def save_merged(base_name="INDIA"):
-    """Save all collected links into one merged m3u"""
-    merged = set()
+def save_merged(base_name="output"):
+    """Save all links into one merged m3u file"""
+    all_links = []
     for cat_links in Scraped_Links.values():
-        merged |= cat_links
+        all_links.extend(cat_links)
+    all_links = list(set(all_links))  # deduplicate
 
-    if not merged:
+    if not all_links:
+        print(colored("[!] No links collected in total", "red"))
         return
-    filename = f"playlists/{base_name}-ALL.m3u"
-    with open(filename, "w", encoding="utf-8") as f:
-        for l in sorted(merged):
-            f.write(f"{l}\n")
-    print(f"[✓] Saved merged playlist ({len(merged)} links) → {filename}")
+    x = datetime.datetime.now()
+    fname = f"playlists/ALL_{base_name}_{x.strftime('%d-%m-%y_%H-%M-%S')}.m3u"
+    with open(fname, "w", encoding="utf-8") as f:
+        for link in all_links:
+            f.write(f"{link}\n")
+    print(colored(f"[*] Saved {len(all_links)} total links → {fname}", "cyan"))
 
 
-def scrape_streamtest(channel, pages=5):
-    """Scrape from streamtest.in"""
-    for p in range(1, pages + 1):
-        url = f"https://streamtest.in/logs/page/{p}?filter={channel}&is_public=true"
+def scrape_streamtest(channel, pages=1):
+    """Scrape tested IPTV links from streamtest.in"""
+    print(colored("[*] Scraping streamtest.in ...", "yellow"))
+    Scraped_Links["Streamtest"] = []
+    for page in range(1, pages + 1):
+        url = f"https://streamtest.in/logs/page/{page}?filter={channel}&is_public=true"
         try:
-            r = requests.get(url, timeout=10).text
-            soup = BeautifulSoup(r, "html.parser")
-            links = soup.select("div.url.is-size-6")
-            for link in links:
-                Scraped_Links["General"].add(link.get_text(strip=True))
-            print(f"[+] Streamtest Page {p}: {len(links)} links found")
+            result = requests.get(url, timeout=15).text
+            scraped_links = re.findall(r'http[s]?://\S+?\.m3u8', result)
+            Scraped_Links["Streamtest"].extend(scraped_links)
+            print(f"  Page {page}: {len(scraped_links)} links")
         except Exception as e:
-            print("[-] Streamtest error:", e)
+            print(colored(f"  [Error page {page}] {e}", "red"))
+    Scraped_Links["Streamtest"] = list(set(Scraped_Links["Streamtest"]))
 
 
-def scrape_iptv_org(url, category, keyword=""):
-    """Generic scraper for iptv-org lists"""
+def scrape_iptv_org(url, category, keyword=None):
+    """Scrape links from iptv-org GitHub playlists"""
+    print(colored(f"[*] Scraping iptv-org ({category}) ...", "yellow"))
+    Scraped_Links[category] = []
     try:
-        r = requests.get(url, timeout=10).text
-        matches = re.findall(r"http[^\s]+", r)
-        for m in matches:
-            if keyword.lower() in m.lower() or keyword == "":
-                Scraped_Links[category].add(m)
-        print(f"[+] {category}: {len(Scraped_Links[category])} links collected")
+        result = requests.get(url, timeout=15).text.splitlines()
+        for line in result:
+            if line.startswith("http"):
+                if not keyword or keyword.lower() in line.lower():
+                    Scraped_Links[category].append(line)
+        Scraped_Links[category] = list(set(Scraped_Links[category]))
+        print(f"  Found {len(Scraped_Links[category])} links in {category}")
     except Exception as e:
-        print(f"[-] {category} error:", e)
+        print(colored(f"  [Error {category}] {e}", "red"))
 
 
 def main():
     # 🎨 Fancy banner
     art = text2art("IPTV Scraper")
     print(colored(art, "cyan"))
-    print(colored("Developed By Surya..!!!", "blue"))
+    print(colored("Developed By Surya...!!!", "blue"))
 
-    channel_name = input("Channel keyword (or leave empty for all India): ").strip()
-    pages = int(input("How many pages to scrape from streamtest.in? "))
+    # If running in CI (GitHub Actions)
+    if len(sys.argv) > 1 and sys.argv[1] == "--ci":
+        channel_name = ""
+        pages = 3
+    else:
+        channel_name = input("Channel keyword (leave empty for all): ").strip()
+        try:
+            pages = int(input("How many pages to scrape from streamtest.in? "))
+        except:
+            pages = 1
 
     ensure_output_dir()
 
-    # Streamtest logs
+    # Scrape sources
     scrape_streamtest(channel_name, pages)
-
-    # iptv-org India categories
     scrape_iptv_org("https://raw.githubusercontent.com/iptv-org/iptv/master/channels/in.m3u", "General", channel_name)
     scrape_iptv_org("https://raw.githubusercontent.com/iptv-org/iptv/master/channels/movies.m3u", "Movies", channel_name)
     scrape_iptv_org("https://raw.githubusercontent.com/iptv-org/iptv/master/channels/news.m3u", "News", channel_name)
     scrape_iptv_org("https://raw.githubusercontent.com/iptv-org/iptv/master/channels/entertainment.m3u", "Entertainment", channel_name)
     scrape_iptv_org("https://raw.githubusercontent.com/iptv-org/iptv/master/channels/sports.m3u", "Sports", channel_name)
 
-    # Save category-wise files
+    # Save results
+    base = channel_name if channel_name else "INDIA"
     for category, links in Scraped_Links.items():
-        save_m3u(category, links, base_name=channel_name if channel_name else "INDIA")
-
-    # Save merged file
-    save_merged(base_name=channel_name if channel_name else "INDIA")
+        save_m3u(category, links, base_name=base)
+    save_merged(base_name=base)
 
     print(colored("✅ Scraping finished.", "green"))
 
