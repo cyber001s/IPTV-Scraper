@@ -1,6 +1,7 @@
 import os
 import re
 import sys
+import shutil
 import datetime
 import requests
 from art import text2art
@@ -12,14 +13,20 @@ init()
 # Global dictionary for all categories
 Scraped_Links = {}
 
+# -----------------------------
+# Folder management
+# -----------------------------
+def clear_playlists_dir():
+    """Delete old playlists before creating new ones"""
+    if os.path.exists("playlists"):
+        shutil.rmtree("playlists")
+    os.makedirs("playlists")
 
-def ensure_output_dir():
-    if not os.path.exists("playlists"):
-        os.makedirs("playlists")
-
-
+# -----------------------------
+# Save functions
+# -----------------------------
 def save_m3u(category, links, base_name="output"):
-    """Save links into a category-specific m3u file"""
+    """Overwrite existing files with new links"""
     if not links:
         print(colored(f"[!] No links found for {category}", "red"))
         return
@@ -29,7 +36,6 @@ def save_m3u(category, links, base_name="output"):
         for link in links:
             f.write(f"{link}\n")
     print(colored(f"[*] Saved {len(links)} links → {fname}", "green"))
-
 
 def save_merged(base_name="output"):
     """Save all links into one merged m3u file"""
@@ -48,7 +54,9 @@ def save_merged(base_name="output"):
             f.write(f"{link}\n")
     print(colored(f"[*] Saved {len(all_links)} total links → {fname}", "cyan"))
 
-
+# -----------------------------
+# Scrapers
+# -----------------------------
 def scrape_streamtest(channel, pages=1):
     """Scrape tested IPTV links from streamtest.in"""
     print(colored("[*] Scraping streamtest.in ...", "yellow"))
@@ -63,7 +71,6 @@ def scrape_streamtest(channel, pages=1):
         except Exception as e:
             print(colored(f"  [Error page {page}] {e}", "red"))
     Scraped_Links["Streamtest"] = list(set(Scraped_Links["Streamtest"]))
-
 
 def scrape_iptv_org_categorized(url):
     """Scrape iptv-org streams and auto-categorize by group-title"""
@@ -100,7 +107,9 @@ def scrape_iptv_org_categorized(url):
     except Exception as e:
         print(colored(f"  [Error] {e}", "red"))
 
-
+# -----------------------------
+# Main function
+# -----------------------------
 def main():
     # Banner
     art = text2art("IPTV Scraper")
@@ -117,7 +126,8 @@ def main():
         except:
             pages = 1
 
-    ensure_output_dir()
+    # Clear old playlists
+    clear_playlists_dir()
 
     # Scrape sources
     scrape_streamtest(channel_name, pages)
