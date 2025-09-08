@@ -2,11 +2,11 @@ name: IPTV-Scraper-Auto
 
 on:
   schedule:
-    - cron: "0 */12 * * *"   # Runs every 12 hours
+    - cron: "0 */12 * * *"
   workflow_dispatch:
 
 permissions:
-  contents: write  # Needed to push commits
+  contents: write
 
 jobs:
   scrape:
