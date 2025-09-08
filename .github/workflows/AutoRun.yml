@@ -1,0 +1,37 @@
+#Auto Run in 12 Hours
+
+name: IPTV-Scraper-Auto
+
+on:
+  schedule:
+    - cron: "0 */12 * * *"   # Runs every 12 hours
+  workflow_dispatch:
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install Dependencies
+        run: |
+          pip install requests beautifulsoup4 art termcolor colorama
+
+      - name: Run Scraper
+        run: |
+          python scraper.py --ci
+
+      - name: Commit & Push Results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add playlists/
+          git commit -m "Auto update playlists [skip ci]" || echo "No changes"
+          git push
