@@ -10,23 +10,22 @@ from termcolor import colored
 
 init()
 
-# Global dictionary for all categories
 Scraped_Links = {}
 
 # -----------------------------
 # Folder management
 # -----------------------------
 def clear_playlists_dir():
-    """Delete old playlists before creating new ones"""
+    """Clear old playlists but always create playlists folder"""
     if os.path.exists("playlists"):
         shutil.rmtree("playlists")
-    os.makedirs("playlists")
+    os.makedirs("playlists", exist_ok=True)
+    print(colored("[*] playlists/ directory ready.", "yellow"))
 
 # -----------------------------
 # Save functions
 # -----------------------------
 def save_m3u(category, links, base_name="output"):
-    """Overwrite existing files with new links"""
     if not links:
         print(colored(f"[!] No links found for {category}", "red"))
         return
@@ -38,12 +37,10 @@ def save_m3u(category, links, base_name="output"):
     print(colored(f"[*] Saved {len(links)} links → {fname}", "green"))
 
 def save_merged(base_name="output"):
-    """Save all links into one merged m3u file"""
     all_links = []
     for cat_links in Scraped_Links.values():
         all_links.extend(cat_links)
-    all_links = list(set(all_links))  # deduplicate
-
+    all_links = list(set(all_links))
     if not all_links:
         print(colored("[!] No links collected in total", "red"))
         return
@@ -58,7 +55,6 @@ def save_merged(base_name="output"):
 # Scrapers
 # -----------------------------
 def scrape_streamtest(channel, pages=1):
-    """Scrape tested IPTV links from streamtest.in"""
     print(colored("[*] Scraping streamtest.in ...", "yellow"))
     Scraped_Links["Streamtest"] = []
     for page in range(1, pages + 1):
@@ -73,7 +69,6 @@ def scrape_streamtest(channel, pages=1):
     Scraped_Links["Streamtest"] = list(set(Scraped_Links["Streamtest"]))
 
 def scrape_iptv_org_categorized(url):
-    """Scrape iptv-org India streams and auto-categorize by group-title"""
     print(colored(f"[*] Scraping iptv-org (auto-categorized) ...", "yellow"))
     try:
         result = requests.get(url, timeout=15).text.splitlines()
@@ -90,17 +85,14 @@ def scrape_iptv_org_categorized(url):
                     category_links[current_group] = []
                 category_links[current_group].append(line)
 
-        # Merge into global dictionary
         for cat, links in category_links.items():
             if cat not in Scraped_Links:
                 Scraped_Links[cat] = []
             Scraped_Links[cat].extend(links)
 
-        # Deduplicate per category
         for cat in Scraped_Links:
             Scraped_Links[cat] = list(set(Scraped_Links[cat]))
 
-        # Print summary
         for cat in category_links:
             print(f"  Found {len(category_links[cat])} links in {cat}")
 
@@ -108,10 +100,9 @@ def scrape_iptv_org_categorized(url):
         print(colored(f"  [Error] {e}", "red"))
 
 # -----------------------------
-# Main function
+# Main
 # -----------------------------
 def main():
-    # Banner
     art = text2art("IPTV Scraper")
     print(colored(art, "cyan"))
     print(colored("Developed By Surya...!!!", "blue"))
@@ -126,21 +117,27 @@ def main():
         except:
             pages = 1
 
-    # Clear old playlists
     clear_playlists_dir()
 
-    # Scrape sources
-    scrape_streamtest(channel_name, pages)
-    scrape_iptv_org_categorized("https://raw.githubusercontent.com/iptv-org/iptv/master/channels/in.m3u")
+    # Scrape sources safely
+    try:
+        scrape_streamtest(channel_name, pages)
+    except Exception as e:
+        print(colored(f"[!] Streamtest scrape failed: {e}", "red"))
 
-    # Save files
+    try:
+        scrape_iptv_org_categorized(
+            "https://raw.githubusercontent.com/iptv-org/iptv/master/channels/in.m3u"
+        )
+    except Exception as e:
+        print(colored(f"[!] IPTV-org scrape failed: {e}", "red"))
+
     base = channel_name if channel_name else "INDIA"
     for category, links in Scraped_Links.items():
         save_m3u(category, links, base_name=base)
     save_merged(base_name=base)
 
     print(colored("✅ Scraping finished.", "green"))
-
 
 if __name__ == "__main__":
     main()
