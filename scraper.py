@@ -96,7 +96,7 @@ def main():
     # 🎨 Fancy banner
     art = text2art("IPTV Scraper")
     print(colored(art, "cyan"))
-    print(colored("Developed By Henry Surya", "blue"))
+    print(colored("Developed By Surya..!!!", "blue"))
 
     channel_name = input("Channel keyword (or leave empty for all India): ").strip()
     pages = int(input("How many pages to scrape from streamtest.in? "))
