@@ -1,7 +1,6 @@
 import os
 import re
 import sys
-import shutil
 import datetime
 import requests
 from art import text2art
@@ -16,11 +15,16 @@ Scraped_Links = {}
 # Folder management
 # -----------------------------
 def clear_playlists_dir():
-    """Clear old playlists but always create playlists folder"""
-    if os.path.exists("playlists"):
-        shutil.rmtree("playlists")
-    os.makedirs("playlists", exist_ok=True)
-    print(colored("[*] playlists/ directory ready.", "yellow"))
+    """Clear only files inside playlists folder, keep folder itself"""
+    if not os.path.exists("playlists"):
+        os.makedirs("playlists")
+    else:
+        # Remove all files inside
+        for filename in os.listdir("playlists"):
+            file_path = os.path.join("playlists", filename)
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+    print(colored("[*] playlists/ directory cleaned.", "yellow"))
 
 # -----------------------------
 # Save functions
@@ -117,9 +121,10 @@ def main():
         except:
             pages = 1
 
+    # Clear old playlist files but keep directory
     clear_playlists_dir()
 
-    # Scrape sources safely
+    # Scrape sources
     try:
         scrape_streamtest(channel_name, pages)
     except Exception as e:
