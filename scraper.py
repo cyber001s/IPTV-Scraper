@@ -73,7 +73,7 @@ def scrape_streamtest(channel, pages=1):
     Scraped_Links["Streamtest"] = list(set(Scraped_Links["Streamtest"]))
 
 def scrape_iptv_org_categorized(url):
-    """Scrape iptv-org streams and auto-categorize by group-title"""
+    """Scrape iptv-org India streams and auto-categorize by group-title"""
     print(colored(f"[*] Scraping iptv-org (auto-categorized) ...", "yellow"))
     try:
         result = requests.get(url, timeout=15).text.splitlines()
@@ -84,8 +84,7 @@ def scrape_iptv_org_categorized(url):
             line = line.strip()
             if line.startswith("#EXTINF"):
                 match = re.search(r'group-title="([^"]+)"', line)
-                if match:
-                    current_group = match.group(1)
+                current_group = match.group(1) if match else "Unknown"
             elif line.startswith("http"):
                 if current_group not in category_links:
                     category_links[current_group] = []
@@ -101,6 +100,7 @@ def scrape_iptv_org_categorized(url):
         for cat in Scraped_Links:
             Scraped_Links[cat] = list(set(Scraped_Links[cat]))
 
+        # Print summary
         for cat in category_links:
             print(f"  Found {len(category_links[cat])} links in {cat}")
 
@@ -131,17 +131,9 @@ def main():
 
     # Scrape sources
     scrape_streamtest(channel_name, pages)
+    scrape_iptv_org_categorized("https://raw.githubusercontent.com/iptv-org/iptv/master/channels/in.m3u")
 
-    iptv_urls = [
-        "https://raw.githubusercontent.com/iptv-org/iptv/master/streams/in.m3u",
-        "https://raw.githubusercontent.com/iptv-org/iptv/master/streams/movies.m3u",
-        "https://raw.githubusercontent.com/iptv-org/iptv/master/streams/news.m3u",
-        "https://raw.githubusercontent.com/iptv-org/iptv/master/streams/entertainment.m3u",
-        "https://raw.githubusercontent.com/iptv-org/iptv/master/streams/sports.m3u",
-    ]
-    for url in iptv_urls:
-        scrape_iptv_org_categorized(url)
-
+    # Save files
     base = channel_name if channel_name else "INDIA"
     for category, links in Scraped_Links.items():
         save_m3u(category, links, base_name=base)
