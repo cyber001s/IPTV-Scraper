@@ -3,14 +3,12 @@ import re
 import sys
 import datetime
 import requests
-from bs4 import BeautifulSoup
 from art import text2art
 from colorama import init
 from termcolor import colored
 
 init()
 
-# Store scraped links by category
 Scraped_Links = {}
 
 
@@ -20,7 +18,6 @@ def ensure_output_dir():
 
 
 def save_m3u(category, links, base_name="output"):
-    """Save links into a category-specific m3u file"""
     if not links:
         print(colored(f"[!] No links found for {category}", "red"))
         return
@@ -33,12 +30,10 @@ def save_m3u(category, links, base_name="output"):
 
 
 def save_merged(base_name="output"):
-    """Save all links into one merged m3u file"""
     all_links = []
     for cat_links in Scraped_Links.values():
         all_links.extend(cat_links)
-    all_links = list(set(all_links))  # deduplicate
-
+    all_links = list(set(all_links))
     if not all_links:
         print(colored("[!] No links collected in total", "red"))
         return
@@ -51,7 +46,6 @@ def save_merged(base_name="output"):
 
 
 def scrape_streamtest(channel, pages=1):
-    """Scrape tested IPTV links from streamtest.in"""
     print(colored("[*] Scraping streamtest.in ...", "yellow"))
     Scraped_Links["Streamtest"] = []
     for page in range(1, pages + 1):
@@ -67,7 +61,6 @@ def scrape_streamtest(channel, pages=1):
 
 
 def scrape_iptv_org(url, category, keyword=None):
-    """Scrape links from iptv-org GitHub playlists"""
     print(colored(f"[*] Scraping iptv-org ({category}) ...", "yellow"))
     Scraped_Links[category] = []
     try:
@@ -83,33 +76,30 @@ def scrape_iptv_org(url, category, keyword=None):
 
 
 def main():
-    # 🎨 Fancy banner
     art = text2art("IPTV Scraper")
     print(colored(art, "cyan"))
     print(colored("Developed By Surya...!!!", "blue"))
 
-    # If running in CI (GitHub Actions)
     if len(sys.argv) > 1 and sys.argv[1] == "--ci":
         channel_name = ""
         pages = 3
     else:
         channel_name = input("Channel keyword (leave empty for all): ").strip()
         try:
-            pages = int(input("How many pages to scrape from streamtest.in? "))
+            pages = int(input("How many pages to scrape from streamtest.in enter page number =   "))
         except:
             pages = 1
 
     ensure_output_dir()
 
-    # Scrape sources
+    # 🔹 Updated IPTV-ORG sources (new structure)
     scrape_streamtest(channel_name, pages)
-    scrape_iptv_org("https://raw.githubusercontent.com/iptv-org/iptv/master/channels/in.m3u", "General", channel_name)
-    scrape_iptv_org("https://raw.githubusercontent.com/iptv-org/iptv/master/channels/movies.m3u", "Movies", channel_name)
-    scrape_iptv_org("https://raw.githubusercontent.com/iptv-org/iptv/master/channels/news.m3u", "News", channel_name)
-    scrape_iptv_org("https://raw.githubusercontent.com/iptv-org/iptv/master/channels/entertainment.m3u", "Entertainment", channel_name)
-    scrape_iptv_org("https://raw.githubusercontent.com/iptv-org/iptv/master/channels/sports.m3u", "Sports", channel_name)
+    scrape_iptv_org("https://raw.githubusercontent.com/iptv-org/iptv/master/streams/in.m3u", "General", channel_name)
+    scrape_iptv_org("https://raw.githubusercontent.com/iptv-org/iptv/master/streams/movies.m3u", "Movies", channel_name)
+    scrape_iptv_org("https://raw.githubusercontent.com/iptv-org/iptv/master/streams/news.m3u", "News", channel_name)
+    scrape_iptv_org("https://raw.githubusercontent.com/iptv-org/iptv/master/streams/entertainment.m3u", "Entertainment", channel_name)
+    scrape_iptv_org("https://raw.githubusercontent.com/iptv-org/iptv/master/streams/sports.m3u", "Sports", channel_name)
 
-    # Save results
     base = channel_name if channel_name else "INDIA"
     for category, links in Scraped_Links.items():
         save_m3u(category, links, base_name=base)
