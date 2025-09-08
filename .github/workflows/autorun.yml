@@ -1,0 +1,45 @@
+name: IPTV-Scraper-Auto
+
+on:
+  schedule:
+    - cron: "0 */12 * * *"   # Runs every 12 hours
+  workflow_dispatch:
+
+permissions:
+  contents: write  # Needed to push commits
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ Checkout the repo
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+        with:
+          persist-credentials: true
+
+      # 2️⃣ Setup Python
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      # 3️⃣ Install dependencies
+      - name: Install Dependencies
+        run: |
+          pip install requests beautifulsoup4 art termcolor colorama
+
+      # 4️⃣ Run the scraper
+      - name: Run Scraper
+        run: |
+          python scraper.py --ci
+
+      # 5️⃣ Commit & push updated playlists
+      - name: Commit & Push Playlists
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add playlists/
+          git commit -m "Auto update playlists [skip ci]" || echo "No changes"
+          git push
